@@ -1,0 +1,64 @@
+/* Design tokens. Change these to restyle the app; dark mode follows the OS. */
+:root {
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --text: #1d1f1e;
+  --muted: #66706b;
+  --border: #dedcd4;
+  --accent: #2f5d50;
+  --accent-text: #ffffff;
+  --danger: #b3261e;
+  --radius: 10px;
+  --space: 16px;
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141716;
+    --surface: #1d2120;
+    --text: #e8ebe9;
+    --muted: #9aa5a0;
+    --border: #2f3533;
+    --accent: #7cc0a8;
+    --accent-text: #0d1a15;
+    --danger: #f2b8b5;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+h1 { font-size: 1.5rem; margin: 0; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space);
+  padding: 12px var(--space); border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.brand { font-weight: 600; white-space: nowrap; }
+.account { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.account .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page { max-width: 640px; margin: 0 auto; padding: calc(var(--space) * 1.5) var(--space); }
+
+.stack { display: flex; flex-direction: column; gap: var(--space); }
+.row { display: flex; align-items: center; gap: 12px; }
+.grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space); }
+.muted { color: var(--muted); }
+.error { color: var(--danger); margin: 0; }
+
+.field { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
+input {
+  font: inherit; color: inherit; background: var(--bg); width: 100%; min-width: 0;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+}
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+button {
+  font: inherit; cursor: pointer; border: 0; border-radius: var(--radius);
+  padding: 10px 16px; background: var(--accent); color: var(--accent-text); font-weight: 600;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+button.link { background: none; color: var(--accent); padding: 4px; font-weight: 500; white-space: nowrap; }

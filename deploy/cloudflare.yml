@@ -1,0 +1,12 @@
+# Expose the app through Cloudflare Tunnel. Needs TUNNEL_TOKEN in .env. In the
+# Cloudflare dashboard, route the public hostname to http://app:8080 (http,
+# not https). No ports are opened on this machine.
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - app
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}

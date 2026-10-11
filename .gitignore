@@ -1,0 +1,19 @@
+.env
+*.sql.gz
+/backups/
+
+# Browser test deps and output (see verify.sh)
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+
+# Frontend deps and build output (dist/.gitkeep stays so go:embed always has a folder)
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+
+# Android: generated build output and, above all, the signing key
+android/**/build/
+android/.gradle/
+*.keystore
+*.jks

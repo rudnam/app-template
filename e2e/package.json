@@ -1,0 +1,8 @@
+{
+  "name": "app-template-e2e",
+  "private": true,
+  "description": "Browser tests. Run them with ../verify.sh, not directly.",
+  "devDependencies": {
+    "@playwright/test": "1.64.0"
+  }
+}

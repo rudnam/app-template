@@ -1,0 +1,53 @@
+# Core stack: the app and its PostgreSQL database. Provider-neutral.
+#
+# How visitors reach the app is a separate, swappable layer in deploy/:
+#   deploy/local.yml       http://localhost:8080 only, on this machine
+#   deploy/cloudflare.yml  Cloudflare Tunnel (no open ports; works behind NAT)
+#   deploy/caddy.yml       Caddy with automatic HTTPS (public IP, ports 80/443)
+#
+# Pick one with COMPOSE_FILE in .env, e.g.
+#   COMPOSE_FILE=docker-compose.yml:deploy/local.yml
+# then use plain `docker compose up -d --build`. See docs/deploy.md.
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    # Built from this folder, or pulled from a registry when APP_IMAGE names
+    # a published build (see docs/deploy.md, "Deploy a published image").
+    image: ${APP_IMAGE:-app-template:local}
+    build:
+      context: .
+      args:
+        VERSION: ${APP_VERSION:-dev}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app?sslmode=disable
+      # Defaults assume an HTTPS proxy in front (Cloudflare or Caddy).
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      PUBLIC_ORIGIN: https://${DOMAIN:-localhost}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ANDROID_PACKAGE: ${ANDROID_PACKAGE:-}
+      ANDROID_CERT_FINGERPRINTS: ${ANDROID_CERT_FINGERPRINTS:-}
+    # No ports here; the deploy/ layer decides how traffic reaches the app.
+
+volumes:
+  pgdata:

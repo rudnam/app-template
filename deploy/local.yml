@@ -1,0 +1,9 @@
+# Run on this machine only, at http://localhost:8080 (no HTTPS, no proxy).
+services:
+  app:
+    environment:
+      COOKIE_SECURE: "false"   # plain http cannot carry a Secure cookie
+      TRUST_PROXY: "false"
+      PUBLIC_ORIGIN: ""
+    ports:
+      - "127.0.0.1:8080:8080"

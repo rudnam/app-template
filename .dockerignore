@@ -1,0 +1,14 @@
+.git
+.github
+.env
+*.md
+docker-compose.yml
+deploy
+docs
+android
+e2e
+scripts
+verify.sh
+preview.sh
+web/node_modules
+web/dist

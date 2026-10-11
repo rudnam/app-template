@@ -1,0 +1,5 @@
+# Added on top of compose.yml by ./preview.sh: publishes the app on this machine.
+services:
+  server:
+    ports:
+      - "127.0.0.1:${PREVIEW_PORT:-8081}:8080"
