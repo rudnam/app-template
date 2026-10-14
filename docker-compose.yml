@@ -1,13 +1,8 @@
 # Core stack: the app and its PostgreSQL database. Provider-neutral.
 #
-# How visitors reach the app is a separate, swappable layer in deploy/:
-#   deploy/local.yml       http://localhost:8080 only, on this machine
-#   deploy/cloudflare.yml  Cloudflare Tunnel (no open ports; works behind NAT)
-#   deploy/caddy.yml       Caddy with automatic HTTPS (public IP, ports 80/443)
-#
-# Pick one with COMPOSE_FILE in .env, e.g.
-#   COMPOSE_FILE=docker-compose.yml:deploy/local.yml
-# then use plain `docker compose up -d --build`. See docs/deploy.md.
+# Where it runs is a layer in deploy/, chosen with COMPOSE_FILE:
+#   deploy/local.yml  http://localhost:8080, for development (.env.example)
+#   deploy/aws.yml    production on AWS, set by the deploy (see README.md)
 
 services:
   db:
@@ -26,8 +21,8 @@ services:
       retries: 10
 
   app:
-    # Built from this folder, or pulled from a registry when APP_IMAGE names
-    # a published build (see docs/deploy.md, "Deploy a published image").
+    # Built from this folder locally; production sets APP_IMAGE to the
+    # commit's image in ECR.
     image: ${APP_IMAGE:-app-template:local}
     build:
       context: .
@@ -39,7 +34,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app?sslmode=disable
-      # Defaults assume an HTTPS proxy in front (Cloudflare or Caddy).
+      # Defaults assume an HTTPS proxy in front (production);
+      # deploy/local.yml overrides them for http://localhost.
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       TRUST_PROXY: ${TRUST_PROXY:-true}
       PUBLIC_ORIGIN: https://${DOMAIN:-localhost}

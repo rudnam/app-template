@@ -33,7 +33,7 @@ docker compose up -d --build    # http://localhost:8080
 |---|---|---|
 | `./verify.sh` | Go vet, Go unit and integration tests, and browser tests, in throwaway containers | Before every commit or deploy. CI runs it too. |
 | `./preview.sh` | Builds the working tree (or `--ref <branch>`) and runs it privately at http://localhost:8081 with a fresh database | To **see** a change, e.g. what an AI just did, before deploying it |
-| `docker compose up -d --build` | Builds and (re)starts the real stack | To deploy |
+| `docker compose up -d --build` | Builds and (re)starts the local stack at http://localhost:8080 | To use it on this machine |
 
 ### Previewing a change before you deploy it
 
@@ -58,21 +58,34 @@ cd web && npm install && npm run dev  # http://localhost:5173
 
 After Go changes, run `docker compose up -d --build` again.
 
-## Deploying
+## Production
 
-[docs/deploy.md](docs/deploy.md) is a step-by-step path. Each step changes only the infrastructure, never the app:
+Production runs on AWS: one EC2 instance behind CloudFront, shared with the other rudnam apps. The infrastructure, backups and server access are in [rudnam/rudnam-infra](https://github.com/rudnam/rudnam-infra).
 
-1. **This machine:** `deploy/local.yml`.
-2. **Your PC on the internet:** Cloudflare Tunnel, with no open ports (`deploy/cloudflare.yml`).
-3. **A server with a public IP** (any VPS, or AWS EC2/Lightsail): Caddy with automatic HTTPS (`deploy/caddy.yml`).
-4. **Managed AWS:** ECS Fargate + RDS + a load balancer, for zero-downtime deploys, several instances and managed backups.
+- **Deploy:** push to `main`. CI (`.github/workflows/ci.yml`) runs `./verify.sh`, builds the image, pushes it to ECR and starts it on the instance with `deploy/aws.yml`. A failed check stops the deploy.
+- **Roll back:** Actions → CI → **Run workflow** on `main`, with the full SHA of an earlier commit. It reuses that commit's image, or rebuilds it.
+- **Settings and secrets:** the production `.env` is the SSM parameter `/rudnam/app-template/env`, not a file in this repo.
+- **Backups:** nightly database dumps (kept 30 days) and daily disk snapshots (7 days). `./preview.sh --restore <dump>.sql.gz` runs a change against one.
+- **Migrations** run on startup and only go forward, and a deploy briefly runs the old and new versions side by side. So every migration must keep the previous release working: adding a table, a nullable column or a column with a default is safe; renaming or dropping a column takes two releases (stop using it, then drop it). Don't roll back past a commit that changed the schema.
 
-### Backups
+### Put a new app on AWS
 
-```sh
-docker compose exec -T db pg_dump -U app app | gzip > backup-$(date +%F).sql.gz   # back up
-gunzip -c backup.sql.gz | docker compose exec -T db psql -U app app                # restore into a fresh stack
-```
+Until these steps are done, CI only verifies: the deploy job waits for the repository's `AWS_DEPLOY_ROLE_ARN` variable.
+
+1. In rudnam-infra, add the app to `apps` in `terraform/variables.tf` with `live = false`, then `terraform plan` and `apply`. That creates its ECR repository and lets the deploy role and the server use it.
+2. Store its production settings: `.env.example`'s variables with real values, as the SecureString `/rudnam/app-template/env` (rudnam-infra README, "App secrets"). Give it a new `POSTGRES_PASSWORD` (`openssl rand -base64 32`).
+3. Give the repository the deploy credentials: `scripts/rotate-github-key.sh` in rudnam-infra (it covers every app in `apps`), then set the variables `AWS_DEPLOY_ROLE_ARN` and `DEPLOY_BUCKET` from `terraform output`.
+4. Push to `main` and check the deploy job.
+5. Set `live = true`, plan and apply. That points the app's DNS name at CloudFront and adds it to Caddy.
+
+## Contributing
+
+1. Fork the repository (or branch, if you have write access) and run it locally (Quick start).
+2. Make the change, following `CLAUDE.md` (it applies to people too).
+3. Run `./verify.sh` until it prints `VERIFY PASSED`, and look at the change with `./preview.sh`.
+4. Open a pull request against `main`. CI runs the same checks and attaches screenshots; nothing deploys until it is merged.
+
+You never need production credentials: pull requests, including ones from forks, run without them.
 
 ## Configuration
 
@@ -84,7 +97,7 @@ All settings are environment variables (read in `internal/config`).
 | `ADDR` | `:8080` | Listen address |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Logs are JSON on stdout. |
 | `COOKIE_SECURE` | `true` | Send the session cookie over HTTPS only. Set `false` only for local http. |
-| `TRUST_PROXY` | `false` | Read the client IP from `CF-Connecting-IP`, or the last `X-Forwarded-For` entry. Enable only when the app is reachable solely through that proxy. `docker-compose.yml` enables it. |
+| `TRUST_PROXY` | `false` | Read the client IP from the last `X-Forwarded-For` entry, which the reverse proxy adds. Enable only when the app is reachable solely through that proxy. `docker-compose.yml` enables it; `deploy/local.yml` turns it off. |
 | `PUBLIC_ORIGIN` | empty | The site's public address, e.g. `https://app.example.com`. Accepted by the CSRF check even if a proxy changes `Host`. |
 | `ALLOW_SIGNUP` | `true` | Set `false` to stop new accounts being created. |
 | `AUTH_RATE_LIMIT` | `10` | Sign-in and sign-up attempts per minute per client IP. |
@@ -106,7 +119,7 @@ The code is split by **feature**: each one owns its SQL, HTTP handlers and page.
 | `internal/testdb/` | Gives integration tests an empty, migrated database. |
 | `web/src/` | The React app: `api.ts` (typed API client), `App.tsx` (sign-in gate), `components/`, and `features/<name>/` pages. |
 | `e2e/` | Playwright browser tests, and the throwaway stack that `verify.sh` and `preview.sh` use. |
-| `deploy/` | Swappable ways to expose the app (local, Cloudflare Tunnel, Caddy). |
+| `deploy/` | Where the app runs: `local.yml` (this machine) and `aws.yml` (production). |
 
 ### Adding a feature
 

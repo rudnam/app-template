@@ -1,0 +1,37 @@
+# Monthly update PRs, grouped so each ecosystem is one PR. Each runs CI like
+# any other PR; merging it deploys.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      go:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directories:
+      - "/web"
+      - "/e2e"
+    schedule:
+      interval: monthly
+    groups:
+      npm:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      docker:
+        patterns: ["*"]

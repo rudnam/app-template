@@ -7,7 +7,7 @@
 #                                e.g. ./verify.sh e2e -g notes
 #
 # Needs only Docker. Uses its own Compose project (<folder>-verify) with the
-# database in tmpfs, so it never touches the live stack or its data, and it
+# database in tmpfs, so it never touches the local stack or its data, and it
 # tears everything down when it exits. Screenshots of failed browser tests
 # land in e2e/test-results/.
 set -euo pipefail
@@ -25,7 +25,7 @@ PW_VERSION=$(sed -n 's/.*"@playwright\/test": *"\([0-9.]*\)".*/\1/p' e2e/package
 : "${PW_VERSION:?could not read the @playwright/test version from e2e/package.json}"
 HOST_UID=$(id -u) HOST_GID=$(id -g)
 export PW_VERSION HOST_UID HOST_GID
-# Keep the live stack's .env (COMPOSE_FILE etc.) out of this.
+# Keep the local stack's .env (COMPOSE_FILE etc.) out of this.
 unset COMPOSE_FILE COMPOSE_PROJECT_NAME
 
 project=${PWD##*/}; project=${project,,}-verify

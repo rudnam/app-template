@@ -19,9 +19,9 @@ type Config struct {
 	// SecureCookies sets the Secure flag on the session cookie. Turn it off
 	// only for local development over plain http.
 	SecureCookies bool
-	// TrustProxy reads the client IP from the headers a reverse proxy sets
-	// (CF-Connecting-IP, else the last X-Forwarded-For entry). Enable it only
-	// when the app is reachable solely through that proxy.
+	// TrustProxy reads the client IP from the last X-Forwarded-For entry,
+	// which the reverse proxy in front adds. Enable it only when the app is
+	// reachable solely through that proxy.
 	TrustProxy bool
 	// PublicOrigin is the site's public address, e.g. https://app.example.com.
 	// Requests from it pass the CSRF origin check even if a proxy rewrites Host.

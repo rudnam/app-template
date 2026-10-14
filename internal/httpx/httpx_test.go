@@ -105,9 +105,10 @@ func TestClientIP(t *testing.T) {
 	if got := ClientIP(r, true); got != "1.2.3.4" {
 		t.Errorf("X-Forwarded-For: %s", got)
 	}
+	// Only Cloudflare could be trusted to set this; a visitor can send it too.
 	r.Header.Set("CF-Connecting-IP", "5.5.5.5")
-	if got := ClientIP(r, true); got != "5.5.5.5" {
-		t.Errorf("CF-Connecting-IP: %s", got)
+	if got := ClientIP(r, true); got != "1.2.3.4" {
+		t.Errorf("with CF-Connecting-IP sent: %s, want it ignored", got)
 	}
 }
 

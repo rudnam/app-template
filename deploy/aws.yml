@@ -1,0 +1,35 @@
+# Run on the AWS instance managed by rudnam/rudnam-infra, behind its shared
+# Caddy and CloudFront. GitHub Actions deploys this (see
+# .github/workflows/deploy.yml); the instance sets
+#   COMPOSE_FILE=docker-compose.yml:deploy/aws.yml
+# and APP_IMAGE to the ECR image of the commit being deployed.
+#
+# No ports here: Caddy reaches the app as "app-template" on the shared "edge"
+# network. The memory limits keep this stack's share of the small (1 GB)
+# instance fixed, so one app can't starve the others.
+services:
+  db:
+    # Sized for a 1 GB server running three apps.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=32MB
+      - -c
+      - max_connections=30
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=16MB
+    mem_limit: 192m
+
+  app:
+    mem_limit: 128m
+    networks:
+      default:
+      edge:
+        aliases:
+          - app-template
+
+networks:
+  edge:
+    external: true
