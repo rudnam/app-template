@@ -26,8 +26,8 @@ The user reviews changes by looking at them, not by deploying them. When you cha
 
 ## Rules
 
-- **Never touch the live stack.** The Compose project named after this folder (`docker compose ...` in the repo root, which reads `.env`) may be production. Don't start, stop, rebuild or exec into it. `verify.sh` and `preview.sh` use their own projects (`<folder>-verify`, `<folder>-preview`).
-- Never edit a migration in `internal/db/migrations/` that may have been deployed; add a new numbered file. Keep each migration compatible with the previous release (see docs/deploy.md, "Migrations").
+- **Production is on AWS, deployed only by CI** when `main` changes (`.github/workflows/ci.yml`; infrastructure in rudnam/rudnam-infra). Nothing on this machine is production: the Compose project named after this folder is local development. `verify.sh` and `preview.sh` use their own projects (`<folder>-verify`, `<folder>-preview`). Don't push to `main` or run AWS commands against production unless asked.
+- Never edit a migration in `internal/db/migrations/` that may have been deployed; add a new numbered file. Keep each migration compatible with the previous release (README.md, "Production").
 - Every query on user data is scoped by user ID in the feature's `Store`. Another user's row is a 404, not a 403.
 - Handlers return errors: `httpx.Errorf(status, msg)` for messages the user should see, and any other error for a logged 500. Don't leak internal errors to the client.
 - Keep dependencies minimal: standard library first in Go; no new npm packages without a clear reason.

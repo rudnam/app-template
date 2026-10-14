@@ -13,14 +13,9 @@ import (
 // through the proxy, or callers can forge their IP.
 func ClientIP(r *http.Request, trustProxy bool) string {
 	if trustProxy {
-		// Cloudflare sets this to the visitor's IP, overwriting any value the
-		// visitor sent.
-		if ip := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); ip != "" {
-			return ip
-		}
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			// The right-most entry was added by our own proxy (Caddy, an AWS
-			// load balancer); entries further left come from the client.
+			// The right-most entry was added by our own proxy (Caddy, behind
+			// CloudFront); entries further left come from the client.
 			parts := strings.Split(xff, ",")
 			return strings.TrimSpace(parts[len(parts)-1])
 		}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs a build in a private preview stack so you can click through a change
-# before you deploy it. It never touches the live stack or its data.
+# before you deploy it. It never touches the local stack or its data.
 #
 #   ./preview.sh                  build the working tree
 #   ./preview.sh --ref <git-ref>  build a branch, tag or commit instead, e.g. the
@@ -18,7 +18,7 @@ cd "$(dirname "$0")"
 PW_VERSION=unused   # e2e/compose.yml needs it set; the preview runs no tests
 PREVIEW_PORT=${PREVIEW_PORT:-8081}
 export PW_VERSION PREVIEW_PORT
-unset COMPOSE_FILE COMPOSE_PROJECT_NAME   # keep the live stack's .env out of this
+unset COMPOSE_FILE COMPOSE_PROJECT_NAME   # keep the local stack's .env out of this
 
 project=${PWD##*/}; project=${project,,}-preview
 dc() { docker compose -p "$project" -f e2e/compose.yml -f e2e/preview.yml "$@"; }
