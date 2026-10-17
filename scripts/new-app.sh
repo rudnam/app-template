@@ -4,14 +4,14 @@
 #   scripts/new-app.sh <name> [go-module]
 #
 # e.g. scripts/new-app.sh habit-tracker creates ../habit-tracker with the Go
-# module github.com/francis/habit-tracker and the display name
+# module github.com/rudnam/habit-tracker and the display name
 # "Habit Tracker", runs its checks, and makes the first commit. It copies
 # the files git knows about (committed or not; ignored files stay behind).
 set -euo pipefail
 
 name=${1:?usage: scripts/new-app.sh <name> [go-module]}
 [[ $name =~ ^[a-z][a-z0-9-]*$ ]] || { echo "name must be lower-case letters, digits and dashes: $name" >&2; exit 2; }
-module=${2:-github.com/francis/$name}
+module=${2:-github.com/rudnam/$name}
 title=$(sed -E 's/(^|-)([a-z])/ \U\2/g; s/^ //' <<<"$name")   # habit-tracker -> Habit Tracker
 
 src=$(cd "$(dirname "$0")/.." && pwd)

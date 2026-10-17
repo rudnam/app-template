@@ -46,7 +46,7 @@ services:
 
   # go vet plus every Go test, including the HTTP integration tests.
   gotest:
-    image: golang:1.26-alpine
+    image: ${GO_IMAGE:?run through verify.sh}
     profiles: [go]
     working_dir: /src
     depends_on:
@@ -57,8 +57,10 @@ services:
       TEST_DATABASE_URL: postgres://app:verify@db:5432/app_test?sslmode=disable
     volumes:
       - ..:/src:ro
-      - gomod:/go/pkg/mod
-      - gobuild:/root/.cache/go-build
+      # GO_MOD_CACHE and GO_BUILD_CACHE, if set, are host directories used
+      # instead of the volumes (CI keeps them between runs with actions/cache).
+      - ${GO_MOD_CACHE:-gomod}:/go/pkg/mod
+      - ${GO_BUILD_CACHE:-gobuild}:/root/.cache/go-build
     command: ["sh", "-c", "go vet ./... && go test -p 1 -count=1 ./..."]
 
   # Playwright browser tests against the app. The image tag comes from
@@ -77,6 +79,14 @@ services:
     volumes:
       - .:/e2e
 
+# The Go caches are shared by every checkout and worktree, so a new one
+# starts warm instead of recompiling everything. External, so that
+# `down --volumes` (preview.sh) and the preview's reaper leave them alone;
+# verify.sh and preview.sh create them.
 volumes:
   gomod:
+    external: true
+    name: app-template-gomod
   gobuild:
+    external: true
+    name: app-template-gobuild

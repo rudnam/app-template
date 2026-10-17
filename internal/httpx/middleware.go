@@ -85,6 +85,9 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
+// Unwrap lets handlers use http.ResponseController, e.g. to extend a deadline.
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
 // LogRequests logs one line per request, except health checks.
 func LogRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

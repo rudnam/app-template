@@ -1,7 +1,5 @@
-# syntax=docker/dockerfile:1
-
 # ---- Web: type-check and bundle the React app into web/dist ----
-FROM node:24-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /web
 # Install dependencies first so this layer stays cached until the lockfile changes.
 COPY web/package.json web/package-lock.json ./
@@ -10,7 +8,7 @@ COPY web/ ./
 RUN npm run build
 
 # ---- Build: compile a static binary with the web app embedded ----
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -18,7 +16,10 @@ COPY . .
 COPY --from=web /web/dist ./web/dist
 # Shown by /healthz and in the startup log, so you can tell which build runs.
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/server ./cmd/server
+# The compiler cache survives between builds, so a rebuild recompiles only
+# what changed.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/server ./cmd/server
 
 # ---- Runtime: no shell, no package manager, non-root ----
 FROM gcr.io/distroless/static-debian12:nonroot

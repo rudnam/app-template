@@ -17,3 +17,7 @@ android/**/build/
 android/.gradle/
 *.keystore
 *.jks
+
+# Claude Code: worktrees of parallel sessions, and personal settings
+.claude/worktrees/
+.claude/settings.local.json
