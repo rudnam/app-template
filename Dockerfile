@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Web: type-check and bundle the React app into web/dist ----
-FROM node:24-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /web
 # Install dependencies first so this layer stays cached until the lockfile changes.
 COPY web/package.json web/package-lock.json ./
@@ -10,7 +10,7 @@ COPY web/ ./
 RUN npm run build
 
 # ---- Build: compile a static binary with the web app embedded ----
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
