@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # ---- Web: type-check and bundle the React app into web/dist ----
 FROM node:26-alpine AS web
 WORKDIR /web
@@ -18,7 +16,10 @@ COPY . .
 COPY --from=web /web/dist ./web/dist
 # Shown by /healthz and in the startup log, so you can tell which build runs.
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/server ./cmd/server
+# The compiler cache survives between builds, so a rebuild recompiles only
+# what changed.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/server ./cmd/server
 
 # ---- Runtime: no shell, no package manager, non-root ----
 FROM gcr.io/distroless/static-debian12:nonroot

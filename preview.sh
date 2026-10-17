@@ -11,16 +11,27 @@
 #   ./preview.sh down             stop the preview and delete its data
 #
 # Then open http://localhost:8081 (PREVIEW_PORT changes it) and sign in as
-# preview@example.com / preview-password. Each start begins from a fresh database.
+# preview@example.com / preview-password. Each start begins from a fresh database
+# with some sample data (e2e/seed), so screens look as they do in real use.
+#
+# The preview stops by itself, data and all, after PREVIEW_MINUTES (default
+# 120; 0 keeps it until `down`), and when the Claude Code session in this
+# folder ends (.claude/hooks/session-end.sh). Starting it again restarts the clock.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 PW_VERSION=unused   # e2e/compose.yml needs it set; the preview runs no tests
+GO_IMAGE=$(sed -n 's/^FROM \(golang:[^ ]*\).*/\1/p' Dockerfile)   # for the seed, as in verify.sh
+: "${GO_IMAGE:?could not read the golang image from the Dockerfile}"
 PREVIEW_PORT=${PREVIEW_PORT:-8081}
-export PW_VERSION PREVIEW_PORT
+PREVIEW_MINUTES=${PREVIEW_MINUTES:-120}
+[[ $PREVIEW_MINUTES =~ ^[0-9]+$ ]] || { echo "PREVIEW_MINUTES must be a number of minutes" >&2; exit 2; }
+DOCKER_BUILDKIT=1   # for the Dockerfile's build cache, even if the environment says not to
 unset COMPOSE_FILE COMPOSE_PROJECT_NAME   # keep the local stack's .env out of this
 
 project=${PWD##*/}; project=${project,,}-preview
+PREVIEW_PROJECT=$project   # for the reaper in preview.yml
+export PW_VERSION GO_IMAGE PREVIEW_PORT PREVIEW_MINUTES PREVIEW_PROJECT DOCKER_BUILDKIT
 dc() { docker compose -p "$project" -f e2e/compose.yml -f e2e/preview.yml "$@"; }
 
 ref='' restore=''
@@ -52,6 +63,8 @@ export APP_VERSION
 
 echo "Previewing $APP_VERSION"
 dc down --volumes --remove-orphans >/dev/null 2>&1 || true
+docker volume create app-template-gomod >/dev/null   # Go caches for the seed,
+docker volume create app-template-gobuild >/dev/null # shared with verify.sh
 if [[ -n $restore ]]; then
   dc up -d --wait db
   echo "Restoring $restore"
@@ -62,12 +75,25 @@ if ! dc up -d --build --wait server; then
   dc logs server | tail -40
   exit 1
 fi
+# Stops the preview after PREVIEW_MINUTES, even if nobody is around to.
+dc up -d reaper >/dev/null 2>&1 || echo "(could not start the timer; stop the preview with ./preview.sh down)"
 
 url=http://localhost:$PREVIEW_PORT
 curl -fsS -o /dev/null -H 'Content-Type: application/json' -H "Origin: $url" \
   -d '{"email":"preview@example.com","password":"preview-password"}' "$url/api/signup" ||
   echo "(could not create the preview user; it may exist in the restored backup)"
 
+# On a fresh database, give the preview user some sample data, so there is
+# something to review. Dates come out in this machine's time zone.
+if [[ -z $restore ]]; then
+  PREVIEW_TZ=${TZ:-$(cat /etc/timezone 2>/dev/null || readlink /etc/localtime 2>/dev/null | sed 's|.*zoneinfo/||' || true)}
+  export PREVIEW_TZ=${PREVIEW_TZ:-UTC}
+  dc --profile seed run --rm seed || echo "(could not add sample data)"
+fi
+
 printf '\n\033[1mPreview of %s is running at %s\033[0m\n' "$APP_VERSION" "$url"
 echo "Sign in as preview@example.com / preview-password"
 echo "Logs: ./preview.sh logs    Stop: ./preview.sh down"
+if (( PREVIEW_MINUTES > 0 )); then
+  echo "It stops by itself at $(date -d "+$PREVIEW_MINUTES minutes" +%H:%M), or when this folder's Claude Code session ends."
+fi

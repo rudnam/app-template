@@ -25,7 +25,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The Go tests' module and build caches, kept between runs so they
+      # compile only what changed. A new key every run saves the updated
+      # cache; restore-keys picks the newest one for the same go.sum and Go.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ runner.temp }}/go-mod
+            ${{ runner.temp }}/go-build
+          key: verify-go-${{ hashFiles('go.sum', 'Dockerfile') }}-${{ github.run_id }}
+          restore-keys: verify-go-${{ hashFiles('go.sum', 'Dockerfile') }}-
       - run: ./verify.sh
+        env:
+          GO_MOD_CACHE: ${{ runner.temp }}/go-mod
+          GO_BUILD_CACHE: ${{ runner.temp }}/go-build
       - name: Upload screenshots and failure traces
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -55,9 +68,11 @@ jobs:
     permissions:
       contents: read
     env:
-      # The repository name is also the ECR repository, the Compose project on
-      # the instance and the app's name in rudnam-infra.
-      APP: ${{ github.event.repository.name }}
+      # The app's name in rudnam-infra: its ECR repository, its folder in the
+      # deploy bucket and its Compose project on the instance (and so its
+      # database volume). Fixed, not the repository name, so renaming the
+      # repository can't break deploys; the deploy role may only touch this app.
+      APP: app-template
       AWS_REGION: ap-southeast-2
       SHA: ${{ inputs.sha || github.sha }}
     steps:

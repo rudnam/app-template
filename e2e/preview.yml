@@ -3,3 +3,42 @@ services:
   server:
     ports:
       - "127.0.0.1:${PREVIEW_PORT:-8081}:8080"
+  # Stops the preview, data and all, after PREVIEW_MINUTES (see preview.sh),
+  # so a forgotten one doesn't keep holding its ports and memory. It removes
+  # this Compose project's containers, volumes and network, then itself. It
+  # sits on no network, so the project's network can go while it runs.
+  reaper:
+    image: docker:27.5-cli
+    network_mode: none
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      PROJECT: ${PREVIEW_PROJECT:?run through preview.sh}
+      MINUTES: ${PREVIEW_MINUTES:-120}
+    command:
+      - sh
+      - -c
+      - |
+        [ "$$MINUTES" -gt 0 ] || exec sleep infinity
+        sleep $$((MINUTES * 60))
+        f="label=com.docker.compose.project=$$PROJECT"
+        docker ps -aq --filter "$$f" | grep -v "^$$(hostname)" | xargs -r docker rm -f
+        docker volume ls -q --filter "$$f" | xargs -r docker volume rm
+        docker network ls -q --filter "$$f" | xargs -r docker network rm
+        docker rm -f "$$(hostname)"
+  # Fills the preview account with sample data (e2e/seed).
+  seed:
+    image: ${GO_IMAGE:?run through preview.sh}
+    profiles: [seed]
+    working_dir: /src
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      CGO_ENABLED: "0"
+      TZ: ${PREVIEW_TZ:-UTC}
+    volumes:
+      - ..:/src:ro
+      - gomod:/go/pkg/mod
+      - gobuild:/root/.cache/go-build
+    command: ["go", "run", "./e2e/seed", "-url", "http://server:8080"]
