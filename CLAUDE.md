@@ -10,11 +10,12 @@ Go API (`internal/`, one package per feature), PostgreSQL, and a React + TypeScr
 ./verify.sh e2e -g notes    # browser tests only; extra args go to `playwright test`
 ```
 
-- It needs only Docker. It builds the working tree, runs it against a throwaway database, and tears everything down. It ends with `VERIFY PASSED` or `VERIFY FAILED`. CI runs the same script on every push and pull request.
+- It needs only Docker. It builds the working tree, runs it against a throwaway database, and tears everything down. It ends with `VERIFY PASSED` or `VERIFY FAILED`. CI runs the same script on every pull request and on pushes to `main`.
 - Plain `go test ./...` on the host **skips** the integration tests (they need `TEST_DATABASE_URL`). `./verify.sh go` runs them.
 - The Docker build type-checks the frontend, so a TypeScript error fails `./verify.sh`. Quick check on the host: `cd web && npm run build`.
 - When a browser test fails, its screenshot is at `e2e/test-results/<test>/test-failed-1.png`. Read it before guessing.
 - Report what the run actually printed. If something was skipped or couldn't run, say so.
+- **If this machine can't run it, let CI run it.** That means: `docker compose ls` lists `<folder>-verify` (another run in this folder is in progress, and starting one would tear it down, since `verify.sh` begins by removing that project), Docker won't start, or the user says the machine is busy. Then commit, push the branch, and read the `verify` check on its pull request: the job log ends with `VERIFY PASSED` or `VERIFY FAILED`, and the screenshots are in the run's `e2e-results` artifact. CI doesn't run on branch pushes, so if the branch has no pull request, open a draft one. In your report, say the result came from CI, not from this machine.
 
 ## Show the user what changed
 
