@@ -1,4 +1,4 @@
-# verify: on every push and pull request, ./verify.sh, with the browser
+# verify: on pull requests and pushes to main, ./verify.sh, with the browser
 #   tests' screenshots kept as the e2e-results artifact.
 # deploy: on pushes to main, build the image, push it to ECR and run it on
 #   the AWS instance (rudnam/rudnam-infra). Also on demand from main: Actions
