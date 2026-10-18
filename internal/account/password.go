@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"testing"
 )
 
 // Passwords use PBKDF2-HMAC-SHA256 from the standard library with 600,000
@@ -18,20 +17,11 @@ import (
 // names its parameters, so the cost can be raised later:
 //
 //	pbkdf2-sha256$<iterations>$<salt, base64>$<key, base64>
-//
-// Test binaries use far fewer, so the integration tests don't spend most of
-// their time hashing; CheckPassword reads the count from the hash either way.
-var iterations = func() int {
-	if testing.Testing() {
-		return 1_000
-	}
-	return 600_000
-}()
-
 const (
-	saltLen = 16
-	keyLen  = 32
-	scheme  = "pbkdf2-sha256"
+	iterations = 600_000
+	saltLen    = 16
+	keyLen     = 32
+	scheme     = "pbkdf2-sha256"
 
 	MinPasswordLen = 10
 	MaxPasswordLen = 256 // bounds the hashing cost of one request

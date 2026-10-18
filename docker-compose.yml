@@ -43,14 +43,6 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ANDROID_PACKAGE: ${ANDROID_PACKAGE:-}
       ANDROID_CERT_FINGERPRINTS: ${ANDROID_CERT_FINGERPRINTS:-}
-      DEMO: ${DEMO:-}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      MAIL_FROM: ${MAIL_FROM:-}
     # No ports here; the deploy/ layer decides how traffic reaches the app.
 
 volumes:

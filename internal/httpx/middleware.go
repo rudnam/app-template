@@ -44,31 +44,6 @@ func SecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// AppOrigin is where the Android app (Capacitor) runs the web app from.
-const AppOrigin = "https://localhost"
-
-// AllowApp lets the Android app call the API across origins (CORS). It
-// sends a bearer token, never cookies, so credentials stay off.
-func AllowApp(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Origin") != AppOrigin || !strings.HasPrefix(r.URL.Path, "/api/") {
-			next.ServeHTTP(w, r)
-			return
-		}
-		h := w.Header()
-		h.Set("Access-Control-Allow-Origin", AppOrigin)
-		h.Add("Vary", "Origin")
-		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
-			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
-			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-App-Client")
-			h.Set("Access-Control-Max-Age", "86400")
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 // CheckOrigin refuses cross-site requests that change data (CSRF). The
 // session cookie is SameSite=Lax already; this is a second, independent check.
 // publicOrigin (may be empty) is accepted even if a proxy rewrites Host.
@@ -94,9 +69,6 @@ func CheckOrigin(publicOrigin string) func(http.Handler) http.Handler {
 }
 
 func sameOrigin(origin, host, publicOrigin string) bool {
-	if origin == AppOrigin {
-		return true // the Android app, which signs in with a bearer token, not a cookie
-	}
 	if u, err := url.Parse(origin); err == nil && u.Host == host {
 		return true
 	}

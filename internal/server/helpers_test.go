@@ -6,7 +6,6 @@ package server_test
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -29,13 +28,6 @@ func init() {
 // the config first.
 func newTestServer(t *testing.T, edit ...func(*config.Config)) *httptest.Server {
 	t.Helper()
-	ts, _ := newTestServerDB(t, edit...)
-	return ts
-}
-
-// newTestServerDB is newTestServer that also gives the test its database.
-func newTestServerDB(t *testing.T, edit ...func(*config.Config)) (*httptest.Server, *sql.DB) {
-	t.Helper()
 	conn := testdb.Open(t)
 	cfg := config.Config{AllowSignup: true, AuthRateLimit: 1000}
 	for _, e := range edit {
@@ -43,13 +35,13 @@ func newTestServerDB(t *testing.T, edit ...func(*config.Config)) (*httptest.Serv
 	}
 	static := fstest.MapFS{
 		"index.html":           {Data: []byte("<!doctype html><title>App</title>")},
-		"landing.html":         {Data: []byte("<!doctype html><title>Landing</title>")},
+		"landing.html":         {Data: []byte("<!doctype html><title>Introduction</title>")},
 		"assets/app-1.js":      {Data: []byte("console.log(1)")},
 		"manifest.webmanifest": {Data: []byte(`{"name":"App"}`)},
 	}
 	ts := httptest.NewServer(server.New(cfg, conn, static, "test"))
 	t.Cleanup(ts.Close)
-	return ts, conn
+	return ts
 }
 
 // client is a browser-like API client with its own cookie jar.
@@ -111,25 +103,4 @@ func get(t *testing.T, url string) (*http.Response, string) {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	return resp, string(body)
-}
-
-// send posts a raw body of the given content type, with extra headers.
-func (c *client) send(path, contentType string, body []byte, headers map[string]string, out any) int {
-	c.t.Helper()
-	req, _ := http.NewRequest("POST", c.base+path, bytes.NewReader(body))
-	req.Header.Set("Content-Type", contentType)
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		c.t.Fatal(err)
-	}
-	defer resp.Body.Close()
-	if out != nil {
-		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-			c.t.Fatalf("POST %s: decode: %v", path, err)
-		}
-	}
-	return resp.StatusCode
 }

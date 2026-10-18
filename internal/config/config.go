@@ -6,11 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/mail"
 	"strconv"
 	"strings"
-
-	"github.com/francis/app-template/internal/mailer"
 )
 
 type Config struct {
@@ -31,9 +28,6 @@ type Config struct {
 	PublicOrigin string
 	// AllowSignup lets new accounts be created.
 	AllowSignup bool
-	// Demo lets visitors try a throwaway demo account full of sample data,
-	// without signing up. It defaults to AllowSignup.
-	Demo bool
 	// AuthRateLimit is sign-in and sign-up attempts per minute per client IP.
 	AuthRateLimit int
 	// AndroidPackage and AndroidCertFingerprints, when set, publish
@@ -41,23 +35,6 @@ type Config struct {
 	// full screen. See android/README.md.
 	AndroidPackage          string
 	AndroidCertFingerprints []string
-	// GoogleClientID and GoogleClientSecret turn on Sign in with Google.
-	// They need PublicOrigin, which gives the callback address.
-	GoogleClientID     string
-	GoogleClientSecret string
-	// GoogleAuthURL and GoogleTokenURL are not read from the environment;
-	// tests point them at a fake Google. Empty means Google's own.
-	GoogleAuthURL, GoogleTokenURL string
-	// SMTPHost and the rest, when set, send the app's own emails: a link
-	// to confirm each new account's address. They need PublicOrigin.
-	SMTPHost     string
-	SMTPPort     int
-	SMTPUsername string
-	SMTPPassword string
-	MailFrom     string
-	// Mailer is not read from the environment; tests set a fake. When nil,
-	// one is built from the SMTP settings.
-	Mailer mailer.Sender
 }
 
 // Load reads the configuration through getenv (os.Getenv in production) and
@@ -75,31 +52,9 @@ func Load(getenv func(string) string) (Config, error) {
 		AuthRateLimit:           r.positiveInt("AUTH_RATE_LIMIT", 10),
 		AndroidPackage:          r.str("ANDROID_PACKAGE", ""),
 		AndroidCertFingerprints: r.list("ANDROID_CERT_FINGERPRINTS"),
-		GoogleClientID:          r.str("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret:      r.str("GOOGLE_CLIENT_SECRET", ""),
-		SMTPHost:                r.str("SMTP_HOST", ""),
-		SMTPPort:                r.positiveInt("SMTP_PORT", 587),
-		SMTPUsername:            r.str("SMTP_USERNAME", ""),
-		SMTPPassword:            r.str("SMTP_PASSWORD", ""),
-		MailFrom:                r.str("MAIL_FROM", ""),
 	}
-	c.Demo = r.bool("DEMO", c.AllowSignup)
 	if (c.AndroidPackage == "") != (len(c.AndroidCertFingerprints) == 0) {
 		r.errs = append(r.errs, errors.New("set both ANDROID_PACKAGE and ANDROID_CERT_FINGERPRINTS, or neither"))
-	}
-	if (c.GoogleClientID == "") != (c.GoogleClientSecret == "") {
-		r.errs = append(r.errs, errors.New("set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or neither"))
-	}
-	if c.GoogleClientID != "" && c.PublicOrigin == "" {
-		r.errs = append(r.errs, errors.New("GOOGLE_CLIENT_ID needs PUBLIC_ORIGIN, e.g. https://app.example.com"))
-	}
-	if c.SMTPHost != "" {
-		if _, err := mail.ParseAddress(c.MailFrom); err != nil {
-			r.errs = append(r.errs, errors.New("SMTP_HOST needs MAIL_FROM, e.g. App Template <no-reply@example.com>"))
-		}
-		if c.PublicOrigin == "" {
-			r.errs = append(r.errs, errors.New("SMTP_HOST needs PUBLIC_ORIGIN, which the emailed links point to"))
-		}
 	}
 	return c, errors.Join(r.errs...)
 }
