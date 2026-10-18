@@ -34,7 +34,7 @@ func TestServesWebApp(t *testing.T) {
 		path, wantBody, wantCache string
 		wantStatus                int
 	}{
-		{"/", "<title>Introduction</title>", "no-cache", 200},
+		{"/", "<title>Landing</title>", "no-cache", 200},
 		{"/app/", "<title>App</title>", "no-cache", 200},
 		{"/app/notes/42", "<title>App</title>", "no-cache", 200}, // client-side route
 		{"/app?x=1", "<title>App</title>", "no-cache", 200},      // redirected to /app/?x=1

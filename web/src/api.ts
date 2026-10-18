@@ -4,6 +4,21 @@ import { language } from './language';
 
 export interface Me {
   email: string;
+  /** False for accounts that only sign in with Google. */
+  has_password: boolean;
+  /** The server emailed a link to confirm the address, and it hasn't been opened yet. */
+  confirm_email: boolean;
+  /** A throwaway demo account full of sample data, deleted within a day. */
+  demo?: boolean;
+}
+
+/** The ways this server offers to sign in. */
+export interface AuthOptions {
+  google: boolean;
+  /** Visitors can try a demo without an account. */
+  demo?: boolean;
+  /** A forgotten password can be reset by email. */
+  reset?: boolean;
 }
 
 export interface Note {
@@ -45,6 +60,14 @@ export const api = {
   signUp: (email: string, password: string) => request<Me>('POST', '/api/signup', { email, password }),
   signIn: (email: string, password: string) => request<Me>('POST', '/api/login', { email, password }),
   signOut: () => request<void>('POST', '/api/logout'),
+  authOptions: () => request<AuthOptions>('GET', '/api/auth/options'),
+  /** Signs in to a new demo account with sample data, in the app's language and this time zone. */
+  startDemo: () => request<Me>('POST', '/api/demo', { tz: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+  resendConfirmation: () => request<void>('POST', '/api/verify-email'),
+  /** Emails a link to choose a new password, if an account uses this address. */
+  forgotPassword: (email: string) => request<void>('POST', '/api/password/forgot', { email }),
+  /** Sets a new password with the emailed link's token, and signs in. */
+  resetPassword: (token: string, password: string) => request<Me>('POST', '/api/password/reset', { token, password }),
 
   notes: () => request<Note[]>('GET', '/api/notes'),
   createNote: (body: string) => request<Note>('POST', '/api/notes', { body }),

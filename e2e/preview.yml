@@ -3,6 +3,12 @@ services:
   server:
     ports:
       - "127.0.0.1:${PREVIEW_PORT:-8081}:8080"
+    environment:
+      PUBLIC_ORIGIN: http://localhost:${PREVIEW_PORT:-8081}
+  # The inbox of every email the preview sends, e.g. confirmation links.
+  mail:
+    ports:
+      - "127.0.0.1:${PREVIEW_MAIL_PORT:-8025}:8025"
   # Stops the preview, data and all, after PREVIEW_MINUTES (see preview.sh),
   # so a forgotten one doesn't keep holding its ports and memory. It removes
   # this Compose project's containers, volumes and network, then itself. It

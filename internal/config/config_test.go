@@ -42,17 +42,40 @@ func TestParsesValues(t *testing.T) {
 
 func TestReportsEveryError(t *testing.T) {
 	_, err := Load(env(map[string]string{
-		"COOKIE_SECURE":   "maybe",
-		"AUTH_RATE_LIMIT": "0",
-		"LOG_LEVEL":       "loud",
-		"ANDROID_PACKAGE": "com.example.app",
+		"COOKIE_SECURE":    "maybe",
+		"AUTH_RATE_LIMIT":  "0",
+		"LOG_LEVEL":        "loud",
+		"ANDROID_PACKAGE":  "com.example.app",
+		"GOOGLE_CLIENT_ID": "id.apps.googleusercontent.com",
+		"SMTP_HOST":        "smtp.example.com",
 	}))
 	if err == nil {
 		t.Fatal("no error")
 	}
-	for _, want := range []string{"DATABASE_URL", "COOKIE_SECURE", "AUTH_RATE_LIMIT", "LOG_LEVEL", "ANDROID_CERT_FINGERPRINTS"} {
+	for _, want := range []string{"DATABASE_URL", "COOKIE_SECURE", "AUTH_RATE_LIMIT", "LOG_LEVEL", "ANDROID_CERT_FINGERPRINTS", "GOOGLE_CLIENT_SECRET", "PUBLIC_ORIGIN", "MAIL_FROM"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error does not mention %s: %v", want, err)
+		}
+	}
+}
+
+func TestDemoFollowsSignup(t *testing.T) {
+	for _, c := range []struct {
+		env  map[string]string
+		want bool
+	}{
+		{map[string]string{}, true},
+		{map[string]string{"ALLOW_SIGNUP": "false"}, false},
+		{map[string]string{"ALLOW_SIGNUP": "false", "DEMO": "true"}, true},
+		{map[string]string{"DEMO": "false"}, false},
+	} {
+		c.env["DATABASE_URL"] = "postgres://x"
+		got, err := Load(env(c.env))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Demo != c.want {
+			t.Errorf("%v: Demo = %v, want %v", c.env, got.Demo, c.want)
 		}
 	}
 }

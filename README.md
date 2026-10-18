@@ -103,6 +103,24 @@ All settings are environment variables (read in `internal/config`).
 | `ALLOW_SIGNUP` | `true` | Set `false` to stop new accounts being created. |
 | `AUTH_RATE_LIMIT` | `10` | Sign-in and sign-up attempts per minute per client IP. |
 | `ANDROID_PACKAGE`, `ANDROID_CERT_FINGERPRINTS` | empty | Publish `/.well-known/assetlinks.json` for the Android app. See [android/README.md](android/README.md). |
+| `DEMO` | as `ALLOW_SIGNUP` | Offer "Try the demo": each visitor gets a throwaway account with sample data in their language (`internal/demo`), without signing up. It has no password and is deleted when they end it or after a day. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | empty | Show "Continue with Google" on the sign-in page. Needs `PUBLIC_ORIGIN`. See [Sign in with Google](#sign-in-with-google). |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` | empty, `587` | Email a link to confirm each new account's address, and links to reset forgotten passwords (port 587 with STARTTLS, or 465). `MAIL_FROM` is e.g. `App Template <no-reply@example.com>`. Needs `PUBLIC_ORIGIN`. Without these, nobody is asked to confirm, and "Forgot your password?" isn't offered. |
+
+### Sign in with Google
+
+1. In the [Google Cloud console](https://console.cloud.google.com/apis/credentials), create a project, set up the OAuth consent screen (External; it asks only for the email address, so Google doesn't need to verify the app), then create an **OAuth client ID** of type *Web application*.
+2. Add the authorized redirect URI `https://<your domain>/api/auth/google/callback`, the same origin as `PUBLIC_ORIGIN`.
+3. Put the client ID and secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and redeploy.
+
+A Google sign-in uses the account with the same email if there is one. If that account's email was never confirmed, its password stops working and its other sessions end, because whoever set the password never proved they own the address.
+
+### Confirming email addresses
+
+With the `SMTP_*` settings, new accounts get an email with a link, and the app shows a reminder until it's opened. People can keep using the app meanwhile. Signing in with Google counts as confirmed. Any SMTP provider works (Resend, Amazon SES, Postmark, or a Gmail account with an app password). The email is in Japanese for someone using the app in Japanese.
+
+The same settings turn on **Forgot your password?** on the sign-in page: it emails a link that works once, for an hour, to choose a new password, which signs out every other session.
+
 
 ## How the code is organized
 
@@ -114,7 +132,9 @@ The code is split by **feature**: each one owns its SQL, HTTP handlers and page.
 | `internal/config/` | Reads and validates every setting from the environment. |
 | `internal/db/` | Connection pool, migrations (`migrations/*.sql`, embedded), shared errors. |
 | `internal/httpx/` | HTTP plumbing every feature shares: handlers that return errors, JSON in and out, middleware (security headers, CSRF origin check, logging, panic recovery), rate limiting. |
-| `internal/account/` | Feature: sign-up, sign-in, sessions, and the `RequireUser` middleware. |
+| `internal/account/` | Feature: sign-up, sign-in, sessions and the `RequireUser` middleware; also Sign in with Google (`google.go`), confirming emails (`verify.go`), password reset (`reset.go`), demo accounts (`demo.go`) and an Android app's bearer-token sign-in (`app.go`). |
+| `internal/mailer/` | Sends the app's emails over SMTP (`SMTP_*`). |
+| `internal/demo/` | Fills a demo account with sample data: the example's notes, in English and Japanese. Fill your own feature's instead. |
 | `internal/notes/` | Feature: **the example**. A per-user list of notes. |
 | `internal/server/` | Wires the features into one handler; serves the web app. Its tests run the whole API against a real database. |
 | `internal/testdb/` | Gives integration tests an empty, migrated database. |
@@ -143,7 +163,7 @@ The language follows the device until someone picks one (the picker in the top b
 
 ### Removing the example
 
-Delete `internal/notes/`, `internal/db/migrations/002_notes.sql`, `internal/server/notes_test.go`, `web/src/features/notes/` and `e2e/tests/notes.spec.js`, then remove its line in `internal/server/server.go`, the note calls in `web/src/api.ts`, the notes strings in `web/src/locales/ja.ts`, and the `<NotesPage />` in `web/src/App.tsx` (plus the note steps in `e2e/tests/screens.spec.js` and `auth.spec.js`, and the sample notes in `e2e/seed/main.go`). Do this **before the first deploy**; afterwards, add a migration that drops the table instead.
+Delete `internal/notes/`, `internal/db/migrations/002_notes.sql`, `internal/server/notes_test.go`, `web/src/features/notes/` and `e2e/tests/notes.spec.js`, then remove its line in `internal/server/server.go`, the note calls in `web/src/api.ts`, the notes strings in `web/src/locales/ja.ts`, and the `<NotesPage />` in `web/src/App.tsx` (plus the note steps in `e2e/tests/screens.spec.js` and `auth.spec.js`, the sample notes in `e2e/seed/main.go`, and `internal/demo`'s). Do this **before the first deploy**; afterwards, add a migration that drops the table instead.
 
 ## API
 
@@ -151,7 +171,16 @@ Delete `internal/notes/`, `internal/db/migrations/002_notes.sql`, `internal/serv
 |---|---|---|---|
 | POST | `/api/signup`, `/api/login` | – | `{email}` and a session cookie. Body `{email, password}`. |
 | POST | `/api/logout` | – | `204` |
-| GET | `/api/me` | user | `{email}` |
+| GET | `/api/me` | user | `{email, has_password, confirm_email, demo}` |
+| DELETE | `/api/me` | user | `204`. Deletes the account and all its data. Body `{password}`, or `{email}` for accounts without a password. |
+| GET | `/api/auth/options` | – | `{google, demo, reset}`: which ways to sign in exist, whether visitors can try a demo, and whether a forgotten password can be reset by email |
+| POST | `/api/demo` | – | Body `{tz}` (the visitor's time zone). Signs in to a new demo account filled with sample data, in the `Accept-Language` language; `201` with `/api/me`'s answer. Only when `DEMO` is on; rate-limited like sign-up. |
+| GET | `/api/auth/google`, `/api/auth/google/callback` | – | Sign in with Google (redirects) |
+| GET | `/api/verify-email?token=` | – | The link in a confirmation email; redirects to the app |
+| POST | `/api/verify-email` | user | `204`. Sends the confirmation email again. |
+| POST | `/api/password/forgot` | – | Body `{email}`. `204` whether or not an account uses it; if one does, a link to `/app/#/reset?token=…` is emailed (at most one a minute). `404` without the `SMTP_*` settings. Rate-limited like sign-in. |
+| POST | `/api/password/reset` | – | Body `{token, password}`, the token from that link (single use, an hour). Sets the password, confirms the email, ends every other session and signs in: returns `/api/me`'s answer. `400` if the link expired or was used. |
+| POST | `/api/auth/app-token` | – | For an Android app: trades the one-time code from Google sign-in in the phone's browser for a session token (`internal/account/app.go`). |
 | GET | `/api/notes` | user | `[{id, body, created_at}]`, newest first |
 | POST | `/api/notes` | user | `201` and the note. Body `{body}`. |
 | DELETE | `/api/notes/{id}` | user | `204`, or `404` |
