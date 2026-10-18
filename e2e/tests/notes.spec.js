@@ -7,6 +7,9 @@ test('add and delete notes', async ({ page }) => {
   const box = page.getByLabel('New note');
   await box.fill('buy milk');
   await box.press('Enter');
+  // The box empties once the note is saved; typing before then would be lost.
+  await expect(page.getByText('buy milk')).toBeVisible();
+  await expect(box).toHaveValue('');
   await box.fill('call mum');
   await page.getByRole('button', { name: 'Add' }).click();
 

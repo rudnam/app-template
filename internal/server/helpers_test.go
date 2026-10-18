@@ -35,6 +35,7 @@ func newTestServer(t *testing.T, edit ...func(*config.Config)) *httptest.Server 
 	}
 	static := fstest.MapFS{
 		"index.html":           {Data: []byte("<!doctype html><title>App</title>")},
+		"landing.html":         {Data: []byte("<!doctype html><title>Introduction</title>")},
 		"assets/app-1.js":      {Data: []byte("console.log(1)")},
 		"manifest.webmanifest": {Data: []byte(`{"name":"App"}`)},
 	}

@@ -1,4 +1,6 @@
 // Typed client for the Go API. Shapes mirror the Go handlers' JSON.
+import { serverText } from './i18n';
+import { language } from './language';
 
 export interface Me {
   email: string;
@@ -24,7 +26,12 @@ export class ApiError extends Error {
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    // The server words emails (and anything else it writes) in the language
+    // the app shows.
+    headers: {
+      'Accept-Language': language(),
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (res.status === 204) return undefined as T;
@@ -44,7 +51,8 @@ export const api = {
   deleteNote: (id: number) => request<void>('DELETE', `/api/notes/${id}`),
 };
 
-/** A message to show for any thrown value. */
+/** A message to show for any thrown value, in the language in use. */
 export function errorMessage(err: unknown): string {
+  if (err instanceof ApiError) return serverText(err.message);
   return err instanceof Error ? err.message : String(err);
 }

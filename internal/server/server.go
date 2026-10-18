@@ -70,12 +70,17 @@ func health(conn *sql.DB, version string) http.Handler {
 	})
 }
 
-// webApp serves the built single-page app. Paths that are not files get
-// index.html, so client-side routes survive a reload. Vite puts content-hashed
-// files in assets/, which can be cached for good; everything else is
-// revalidated, so a deploy shows up on the next load.
+// webApp serves the built web app. The introduction page (landing.html) is
+// at /, and the single-page app (index.html) at /app/: paths under /app/ that
+// are not files get index.html, so client-side routes survive a reload. Vite
+// puts content-hashed files in assets/, which can be cached for good;
+// everything else is revalidated, so a deploy shows up on the next load.
 func webApp(static fs.FS) http.Handler {
 	files := http.FileServerFS(static)
+	index, err := fs.ReadFile(static, "index.html")
+	if err != nil {
+		index = []byte("<!doctype html><title>Missing build</title>")
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
@@ -88,13 +93,24 @@ func webApp(static fs.FS) http.Handler {
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")
 		}
-		if name != "" && path.Ext(name) == "" {
-			if fi, err := fs.Stat(static, name); err != nil || fi.IsDir() {
-				http.ServeFileFS(w, r, static, "index.html")
-				return
+		switch {
+		case name == "" || name == "landing.html":
+			http.ServeFileFS(w, r, static, "landing.html")
+		case r.URL.Path == "/app":
+			to := "/app/"
+			if r.URL.RawQuery != "" {
+				to += "?" + r.URL.RawQuery
 			}
+			http.Redirect(w, r, to, http.StatusMovedPermanently)
+		case name == "app" || strings.HasPrefix(name, "app/") || name == "index.html":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write(index)
+		case path.Ext(name) == "":
+			// Not a file, and no page of ours: no directory listings.
+			http.NotFound(w, r)
+		default:
+			files.ServeHTTP(w, r)
 		}
-		files.ServeHTTP(w, r)
 	})
 }
 

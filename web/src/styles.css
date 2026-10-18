@@ -62,3 +62,10 @@ button {
 }
 button:disabled { opacity: 0.5; cursor: default; }
 button.link { background: none; color: var(--accent); padding: 4px; font-weight: 500; white-space: nowrap; }
+a.brand { color: inherit; text-decoration: none; }
+select.language {
+  font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px 6px;
+}
+/* On a phone the top bar has room for the actions, not the address. */
+@media (max-width: 480px) { .account .muted { display: none; } }

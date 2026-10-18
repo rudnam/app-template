@@ -1,6 +1,8 @@
 // The example feature's page. See internal/notes for the API side.
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, errorMessage, type Note } from '../../api';
+import { t } from '../../i18n';
+import { locale } from '../../language';
 
 export function NotesPage() {
   const [notes, setNotes] = useState<Note[] | null>(null);
@@ -35,16 +37,16 @@ export function NotesPage() {
 
   return (
     <section className="stack">
-      <h1>Notes</h1>
+      <h1>{t('Notes')}</h1>
       <form className="row" onSubmit={add}>
         <input
-          aria-label="New note"
-          placeholder="Write a note…"
+          aria-label={t('New note')}
+          placeholder={t('Write a note…')}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         />
         <button type="submit" disabled={!draft.trim()}>
-          Add
+          {t('Add')}
         </button>
       </form>
       {error && (
@@ -53,19 +55,19 @@ export function NotesPage() {
         </p>
       )}
       {notes === null ? (
-        <p className="muted">Loading…</p>
+        <p className="muted">{t('Loading…')}</p>
       ) : notes.length === 0 ? (
-        <p className="muted">No notes yet.</p>
+        <p className="muted">{t('No notes yet.')}</p>
       ) : (
-        <ul className="list" aria-label="Notes">
+        <ul className="list" aria-label={t('Notes')}>
           {notes.map((n) => (
             <li key={n.id} className="card row">
               <span className="grow">{n.body}</span>
               <time className="muted" dateTime={n.created_at}>
-                {new Date(n.created_at).toLocaleDateString()}
+                {new Date(n.created_at).toLocaleDateString(locale())}
               </time>
-              <button className="link" aria-label={`Delete note: ${n.body}`} onClick={() => remove(n.id)}>
-                Delete
+              <button className="link" aria-label={t('Delete note: {body}', { body: n.body })} onClick={() => remove(n.id)}>
+                {t('Delete')}
               </button>
             </li>
           ))}
