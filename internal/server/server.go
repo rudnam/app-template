@@ -14,9 +14,14 @@ import (
 
 	"github.com/francis/app-template/internal/account"
 	"github.com/francis/app-template/internal/config"
+	"github.com/francis/app-template/internal/demo"
 	"github.com/francis/app-template/internal/httpx"
+	"github.com/francis/app-template/internal/mailer"
 	"github.com/francis/app-template/internal/notes"
 )
+
+// appName is what emails call the app.
+const appName = "App Template"
 
 func init() {
 	// The runtime image has no /etc/mime.types, and Go doesn't know this one.
@@ -33,14 +38,40 @@ func New(cfg config.Config, conn *sql.DB, static fs.FS, version string) http.Han
 	}
 
 	// Features
+	var google *account.GoogleConfig
+	if cfg.GoogleClientID != "" {
+		google = &account.GoogleConfig{
+			ClientID:     cfg.GoogleClientID,
+			ClientSecret: cfg.GoogleClientSecret,
+			RedirectURL:  cfg.PublicOrigin + "/api/auth/google/callback",
+			AuthURL:      cfg.GoogleAuthURL,
+			TokenURL:     cfg.GoogleTokenURL,
+		}
+	}
+	sender := cfg.Mailer
+	if sender == nil && cfg.SMTPHost != "" {
+		sender = &mailer.SMTP{Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername,
+			Password: cfg.SMTPPassword, From: cfg.MailFrom}
+	}
+	notesStore := notes.NewStore(conn)
+	var demoFiller account.DemoFiller
+	if cfg.Demo {
+		demoFiller = demo.Filler(notesStore)
+	}
 	accounts := account.NewHandler(account.Config{
+		AppName:           appName,
 		SecureCookies:     cfg.SecureCookies,
 		TrustProxy:        cfg.TrustProxy,
 		AllowSignup:       cfg.AllowSignup,
 		AttemptsPerMinute: cfg.AuthRateLimit,
+		Google:            google,
+		Mail:              sender,
+		PublicOrigin:      cfg.PublicOrigin,
+		AppScheme:         cfg.AndroidPackage,
+		Demo:              demoFiller,
 	}, account.NewStore(conn))
 	accounts.Register(mux)
-	notes.NewHandler(notes.NewStore(conn)).Register(mux, accounts.RequireUser)
+	notes.NewHandler(notesStore).Register(mux, accounts.RequireUser)
 
 	// Unknown API paths get a JSON 404 rather than the web page.
 	mux.Handle("/api/", httpx.HandlerFunc(func(http.ResponseWriter, *http.Request) error {
@@ -52,6 +83,7 @@ func New(cfg config.Config, conn *sql.DB, static fs.FS, version string) http.Han
 		httpx.LogRequests,
 		httpx.Recover,
 		httpx.SecurityHeaders,
+		httpx.AllowApp,
 		httpx.CheckOrigin(cfg.PublicOrigin),
 	)
 }

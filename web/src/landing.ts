@@ -13,6 +13,17 @@ else {
     translate();
   });
   revealOnScroll();
+  offerDemo();
+}
+
+// "Try the demo" shows only when the server offers demos (DEMO).
+function offerDemo() {
+  fetch('/api/auth/options')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((o: { demo?: boolean } | null) => {
+      if (o?.demo) document.querySelectorAll<HTMLElement>('[data-demo-hidden]').forEach((el) => (el.hidden = false));
+    })
+    .catch(() => {}); // without it, the page simply has no demo button
 }
 
 // The page is written in English; each text's Japanese is in its data-ja
