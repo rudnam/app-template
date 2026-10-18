@@ -12,6 +12,10 @@ for (const [name, viewport] of [
     const shot = (label) => page.screenshot({ path: test.info().outputPath(`${name}-${label}.png`), fullPage: true });
 
     await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await shot('0-introduction');
+
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
     await shot('1-sign-in');
 

@@ -2,7 +2,7 @@ const { test, expect, uniqueEmail, PASSWORD } = require('./fixtures');
 
 test('sign up, sign out and sign in again', async ({ page }) => {
   const email = uniqueEmail();
-  await page.goto('/');
+  await page.goto('/app/');
   await page.getByRole('button', { name: 'New here? Create an account' }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
@@ -22,7 +22,7 @@ test('sign up, sign out and sign in again', async ({ page }) => {
 });
 
 test('a wrong password shows an error', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.getByLabel('Email').fill(uniqueEmail());
   await page.getByLabel('Password').fill('not the password');
   await page.getByRole('button', { name: 'Sign in' }).click();

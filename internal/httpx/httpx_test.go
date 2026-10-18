@@ -126,3 +126,21 @@ func TestRateLimiter(t *testing.T) {
 		t.Fatal("no refill after half the window")
 	}
 }
+
+func TestLanguage(t *testing.T) {
+	for header, want := range map[string]string{
+		"":                           "en",
+		"ja":                         "ja",
+		"ja-JP,ja;q=0.9,en-US;q=0.8": "ja",
+		"en-US,en;q=0.9,ja;q=0.8":    "en",
+		"fr-FR, ja;q=0.5":            "en",
+		"en;q=0.4, ja-JP;q=0.7":      "ja",
+		"*":                          "en",
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.Header.Set("Accept-Language", header)
+		if got := Language(r); got != want {
+			t.Errorf("Language(%q) = %q, want %q", header, got, want)
+		}
+	}
+}

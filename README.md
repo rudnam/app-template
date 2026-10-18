@@ -13,7 +13,7 @@
 A web app with a Go API, a React frontend, and PostgreSQL, shipped as one Docker image.
 
 - **Backend:** Go, standard library plus one PostgreSQL driver (`github.com/lib/pq`).
-- **Frontend:** React + TypeScript, bundled by Vite and embedded in the Go binary. Installable as a PWA.
+- **Frontend:** React + TypeScript, bundled by Vite and embedded in the Go binary. An introduction page at `/` and the app at `/app/`, both in English and Japanese. Installable as a PWA.
 - **Database:** PostgreSQL. Migrations are embedded SQL files, applied on startup.
 - **Packaging:** one small, non-root Docker image (under 20 MB) with no shell.
 - **Android:** the same site, packaged as an app (see [android/README.md](android/README.md)).
@@ -54,7 +54,7 @@ You can also skip running anything: `./verify.sh` saves screenshots of the main 
 With the local stack running (Quick start), start Vite's dev server. It forwards `/api` to `localhost:8080`:
 
 ```sh
-cd web && npm install && npm run dev  # http://localhost:5173
+cd web && npm install && npm run dev  # http://localhost:5173 (the introduction), /index.html (the app)
 ```
 
 After Go changes, run `docker compose up -d --build` again.
@@ -118,7 +118,8 @@ The code is split by **feature**: each one owns its SQL, HTTP handlers and page.
 | `internal/notes/` | Feature: **the example**. A per-user list of notes. |
 | `internal/server/` | Wires the features into one handler; serves the web app. Its tests run the whole API against a real database. |
 | `internal/testdb/` | Gives integration tests an empty, migrated database. |
-| `web/src/` | The React app: `api.ts` (typed API client), `App.tsx` (sign-in gate), `components/`, and `features/<name>/` pages. |
+| `web/src/` | The React app: `api.ts` (typed API client), `App.tsx` (sign-in gate), `components/`, and `features/<name>/` pages. `i18n.tsx`, `language.ts` and `locales/ja.ts` translate it (below). |
+| `web/landing.html`, `web/src/landing.*` | The introduction page at `/`. Its Japanese is in each element's `data-ja`. |
 | `e2e/` | Playwright browser tests, the throwaway stack that `verify.sh` and `preview.sh` use, and `seed/`, the preview's sample data. |
 | `.claude/` | Claude Code hooks: make Docker work in cloud sessions, and stop this folder's preview when a session ends. |
 | `deploy/` | Where the app runs: `local.yml` (this machine) and `aws.yml` (production). |
@@ -134,9 +135,15 @@ Follow the notes example; a feature is about five files:
 5. `web/src/api.ts` (types and calls), `web/src/features/<name>/` (the page), and `e2e/tests/<name>.spec.js` (a browser test).
 6. Optionally, sample data for the preview in `e2e/seed/main.go`.
 
+### Translating
+
+The app is written in English, and the English is the key: `t('Save')` shows "Save", or its entry in `web/src/locales/ja.ts` in Japanese. A key missing from `ja.ts` fails the type check, so nothing ships half-translated. Use `tn()` for counts and `tx()` for text with elements in it. The server's messages stay in English (old clients show them as they are); list each in `jaServer`, and `errorMessage()` shows it in Japanese. The app sends its language as `Accept-Language`, and `httpx.Language(r)` reads it, for anything the server writes, such as emails.
+
+The language follows the device until someone picks one (the picker in the top bar, or the switch on the introduction page); the choice is kept in the browser and shared by both pages.
+
 ### Removing the example
 
-Delete `internal/notes/`, `internal/db/migrations/002_notes.sql`, `internal/server/notes_test.go`, `web/src/features/notes/` and `e2e/tests/notes.spec.js`, then remove its line in `internal/server/server.go`, the note calls in `web/src/api.ts`, and the `<NotesPage />` in `web/src/App.tsx` (plus the note steps in `e2e/tests/screens.spec.js` and `auth.spec.js`, and the sample notes in `e2e/seed/main.go`). Do this **before the first deploy**; afterwards, add a migration that drops the table instead.
+Delete `internal/notes/`, `internal/db/migrations/002_notes.sql`, `internal/server/notes_test.go`, `web/src/features/notes/` and `e2e/tests/notes.spec.js`, then remove its line in `internal/server/server.go`, the note calls in `web/src/api.ts`, the notes strings in `web/src/locales/ja.ts`, and the `<NotesPage />` in `web/src/App.tsx` (plus the note steps in `e2e/tests/screens.spec.js` and `auth.spec.js`, and the sample notes in `e2e/seed/main.go`). Do this **before the first deploy**; afterwards, add a migration that drops the table instead.
 
 ## API
 

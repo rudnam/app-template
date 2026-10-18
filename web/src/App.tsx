@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError, errorMessage, type Me } from './api';
 import { AuthForm } from './components/AuthForm';
+import { LanguagePicker } from './components/LanguagePicker';
 import { NotesPage } from './features/notes/NotesPage';
+import { t, useLanguage } from './i18n';
 
 type Session =
   | { status: 'loading' }
@@ -11,6 +13,7 @@ type Session =
 
 export function App() {
   const [session, setSession] = useState<Session>({ status: 'loading' });
+  useLanguage(); // redraw everything when the language changes
 
   useEffect(() => {
     api
@@ -33,21 +36,26 @@ export function App() {
   return (
     <>
       <header className="topbar">
-        <span className="brand">App Template</span>
-        {session.status === 'signed-in' && (
-          <span className="account">
-            <span className="muted">{session.me.email}</span>
-            <button className="link" onClick={signOut}>
-              Sign out
-            </button>
-          </span>
-        )}
+        <a className="brand" href="/">
+          App Template
+        </a>
+        <span className="account">
+          {session.status === 'signed-in' && (
+            <>
+              <span className="muted">{session.me.email}</span>
+              <button className="link" onClick={signOut}>
+                {t('Sign out')}
+              </button>
+            </>
+          )}
+          <LanguagePicker />
+        </span>
       </header>
       <main className="page">
-        {session.status === 'loading' && <p className="muted">Loading…</p>}
+        {session.status === 'loading' && <p className="muted">{t('Loading…')}</p>}
         {session.status === 'error' && (
           <p role="alert" className="error">
-            Could not reach the server: {session.message}
+            {t('Could not reach the server: {error}', { error: session.message })}
           </p>
         )}
         {session.status === 'signed-out' && (

@@ -15,6 +15,18 @@ test('the web app is installable: manifest and icons are served', async ({ reque
 });
 
 test('client-side routes load the app', async ({ page }) => {
-  await page.goto('/some/deep/link');
+  await page.goto('/app/some/deep/link');
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+});
+
+test('the introduction at / leads to the app at /app/', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: 'Get started' }).first().click();
+  await expect(page).toHaveURL(/\/app\/$/);
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+
+  // A link meant for the app on the old address goes to the app.
+  await page.goto('/#/somewhere');
+  await expect(page).toHaveURL(/\/app\/#\/somewhere$/);
 });

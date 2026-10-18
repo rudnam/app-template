@@ -35,8 +35,8 @@ async function signUp(page) {
   const email = uniqueEmail();
   const res = await page.request.post('/api/signup', { data: { email, password: PASSWORD } });
   base.expect(res.status(), await res.text()).toBe(201);
-  await page.goto('/');
-  await base.expect(page.getByText(email)).toBeVisible();
+  await page.goto('/app/');
+  await base.expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   return email;
 }
 
