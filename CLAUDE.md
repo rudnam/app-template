@@ -22,7 +22,7 @@ The user reviews changes by looking at them, not by deploying them. When you cha
 
 1. Extend a browser test in `e2e/tests/` (one file per feature; import `{ test, expect }` from `./fixtures`, which fails on any console error or CSP violation). For new screens, add a step to `e2e/tests/screens.spec.js`, which saves phone and desktop screenshots.
 2. Run `./verify.sh`, then **Read the screenshots** in `e2e/test-results/` and check the change looks right at both widths.
-3. On the user's machine, run `./preview.sh` and tell the user: "Preview at http://localhost:8081, sign in as preview@example.com / preview-password", plus what to click to see the change. In a cloud session the user can't open that address, so send them the screenshots instead. You don't need to stop it: it stops by itself after two hours (`PREVIEW_MINUTES`) and when this session ends (`.claude/hooks/session-end.sh`, which also clears anything a killed `verify.sh` left).
+3. On the user's machine, run `./preview.sh` and tell the user: "Preview at http://localhost:8081, sign in as preview@example.com / preview-password", plus what to click to see the change. In a cloud session the user can't open that address, so send them the screenshots instead. You don't need to stop it: it stops by itself after two hours (`PREVIEW_MINUTES`), when the PR from its branch is merged, and when this session ends (`.claude/hooks/session-end.sh`, which also clears anything a killed `verify.sh` left).
 
 ## Rules
 
