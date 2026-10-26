@@ -44,8 +44,8 @@ down() { dc --profile go --profile e2e down --remove-orphans --timeout 1 >/dev/n
 down   # whatever an earlier run left behind
 docker volume create app-template-gomod >/dev/null
 docker volume create app-template-gobuild >/dev/null
-golog=''
-trap 'down; rm -f "$golog"' EXIT
+golog=$(mktemp) buildlog=$(mktemp)
+trap 'down; rm -f "$golog" "$buildlog"' EXIT
 
 # Pull the browser image while the app builds, not after: it's large, and a
 # fresh machine (CI) or a new Playwright version has to download it.
@@ -61,26 +61,36 @@ gostep="Go: vet and tests (with integration tests)"
 if [[ $mode == go ]]; then
   step "$gostep"
   dc --profile go run --rm gotest || status=1
-elif [[ $mode == all ]]; then
-  # The Go tests use their own database (app_test), so they run while the app
-  # builds and the browser tests run. Their output is shown when they finish.
-  dc up -d --wait db >/dev/null 2>&1 || true
-  golog=$(mktemp)
-  dc --profile go run --rm gotest >"$golog" 2>&1 & gopid=$!
-fi
-
-if [[ $mode == all || $mode == e2e ]]; then
+else
+  # Each container takes seconds to create on Docker Desktop, so everything
+  # that doesn't need the new image starts while it builds. The build's output
+  # is shown only if it fails.
   step "Build and start the app"
-  if dc up -d --build --wait server; then
-    step "Browser tests (Playwright $PW_VERSION)"
-    wait "$pullpid" || true   # if the pull failed, the run below pulls again
-    # Reinstall only when node_modules is missing or out of date.
-    dc --profile e2e run --rm e2e sh -c \
-      'npm ls @playwright/test >/dev/null 2>&1 || npm ci --no-audit --no-fund --loglevel=error; npx playwright test "$@"' \
-      sh "$@" || status=1
-  else
+  dc build server >"$buildlog" 2>&1 & buildpid=$!
+  dc up -d --wait db mail >/dev/null 2>&1 || true   # if this failed, the up below says why
+  if [[ $mode == all ]]; then
+    # The Go tests use their own database (app_test), so they run while the
+    # app builds and the browser tests run. Their output is shown when they finish.
+    dc --profile go run --rm gotest >"$golog" 2>&1 & gopid=$!
+  fi
+  wait "$pullpid" || true   # if the pull failed, the up below pulls again
+  # Reinstall only when node_modules is missing or out of date.
+  if ! dc --profile e2e up -d --no-deps e2e >/dev/null 2>&1 ||
+     ! dc --profile e2e exec -T e2e sh -c \
+       'npm ls @playwright/test >/dev/null 2>&1 || npm ci --no-audit --no-fund --loglevel=error'; then
+    echo "could not start the browser tests' container" >&2
+    status=1
+  fi
+  if ! wait "$buildpid"; then
+    cat "$buildlog"
+    status=1
+  elif ! dc up -d --wait server; then
     dc logs server db | tail -40
     status=1
+  elif [[ $status == 0 ]]; then
+    step "Browser tests (Playwright $PW_VERSION)"
+    tty=(); [[ -t 0 && -t 1 ]] || tty=(-T)
+    dc --profile e2e exec "${tty[@]}" e2e npx playwright test "$@" || status=1
   fi
 fi
 
