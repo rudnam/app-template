@@ -15,8 +15,10 @@
 # with some sample data (e2e/seed), so screens look as they do in real use.
 #
 # The preview stops by itself, data and all, after PREVIEW_MINUTES (default
-# 120; 0 keeps it until `down`), and when the Claude Code session in this
-# folder ends (.claude/hooks/session-end.sh). Starting it again restarts the clock.
+# 120; 0 keeps it until `down`), when a pull request from the branch it shows
+# is merged (checked every minute with the GitHub CLI, if it's signed in), and
+# when the Claude Code session in this folder ends (.claude/hooks/session-end.sh).
+# Starting it again restarts the clock.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -34,10 +36,37 @@ PREVIEW_PROJECT=$project   # for the reaper in preview.yml
 export PW_VERSION GO_IMAGE PREVIEW_PORT PREVIEW_MINUTES PREVIEW_PROJECT DOCKER_BUILDKIT
 dc() { docker compose -p "$project" -f e2e/compose.yml -f e2e/preview.yml "$@"; }
 
+# The merge watcher (see watch_merge) runs on this machine, not in Docker: it
+# needs this machine's GitHub sign-in. Its process ID is kept per worktree.
+watcher=$(git rev-parse --git-path preview-merge-watch.pid 2>/dev/null || echo .preview-merge-watch.pid)
+stop_watcher() {
+  [[ -f $watcher ]] || return 0
+  kill "$(cat "$watcher")" 2>/dev/null || true
+  rm -f "$watcher"
+}
+
+# Stops the preview once a pull request from $1 merged after $2 (UTC, as
+# GitHub writes it): what it shows is in main now. Gives up when the preview
+# is gone for another reason.
+watch_merge() {
+  local branch=$1 since=$2 merged
+  while sleep "${PREVIEW_WATCH_SECONDS:-60}"; do
+    [[ -n $(docker compose -p "$project" ps -q 2>/dev/null) ]] || break
+    merged=$(gh pr list --head "$branch" --state merged --json mergedAt \
+      --jq "map(select(.mergedAt > \"$since\")) | length" 2>/dev/null) || continue
+    if (( merged > 0 )); then
+      docker compose -p "$project" down --volumes --remove-orphans --timeout 1 >/dev/null 2>&1
+      break
+    fi
+  done
+  rm -f "$watcher"
+}
+
 ref='' restore=''
 while (( $# )); do
   case $1 in
-    down) dc down --volumes --remove-orphans; exit ;;
+    down) stop_watcher; dc down --volumes --remove-orphans; exit ;;
+    _watch-merge) watch_merge "$2" "$3"; exit ;;   # started by preview.sh itself
     logs) dc logs -f server; exit ;;
     --ref) ref=${2:?--ref needs a branch, tag or commit}; shift 2 ;;
     --restore) restore=${2:?--restore needs a backup file}; shift 2 ;;
@@ -62,6 +91,7 @@ fi
 export APP_VERSION
 
 echo "Previewing $APP_VERSION"
+stop_watcher
 dc down --volumes --remove-orphans >/dev/null 2>&1 || true
 docker volume create app-template-gomod >/dev/null   # Go caches for the seed,
 docker volume create app-template-gobuild >/dev/null # shared with verify.sh
@@ -77,6 +107,21 @@ if ! dc up -d --build --wait server; then
 fi
 # Stops the preview after PREVIEW_MINUTES, even if nobody is around to.
 dc up -d reaper >/dev/null 2>&1 || echo "(could not start the timer; stop the preview with ./preview.sh down)"
+
+# And when the branch it shows is merged. Main itself, or a commit that's no
+# branch, never is.
+if [[ -n $ref ]]; then
+  branch=${ref#origin/}
+  git show-ref -q --verify "refs/heads/$branch" || git show-ref -q --verify "refs/remotes/origin/$branch" || branch=''
+else
+  branch=$(git symbolic-ref -q --short HEAD 2>/dev/null || true)
+fi
+merge_note=''
+if [[ -n $branch && $branch != main ]] && command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
+  setsid "$PWD/${0##*/}" _watch-merge "$branch" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" </dev/null >/dev/null 2>&1 &
+  echo $! >"$watcher"
+  merge_note=", when $branch is merged"
+fi
 
 url=http://localhost:$PREVIEW_PORT
 curl -fsS -o /dev/null -H 'Content-Type: application/json' -H "Origin: $url" \
@@ -96,5 +141,7 @@ echo "Sign in as preview@example.com / preview-password"
 echo "Emails the app sends (e.g. confirmation links): http://localhost:${PREVIEW_MAIL_PORT:-8025}"
 echo "Logs: ./preview.sh logs    Stop: ./preview.sh down"
 if (( PREVIEW_MINUTES > 0 )); then
-  echo "It stops by itself at $(date -d "+$PREVIEW_MINUTES minutes" +%H:%M), or when this folder's Claude Code session ends."
+  echo "It stops by itself at $(date -d "+$PREVIEW_MINUTES minutes" +%H:%M)$merge_note, or when this folder's Claude Code session ends."
+elif [[ -n $merge_note ]]; then
+  echo "It stops by itself${merge_note#,}, or when this folder's Claude Code session ends."
 fi
