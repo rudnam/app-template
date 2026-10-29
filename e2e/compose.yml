@@ -29,6 +29,9 @@ services:
       context: ${BUILD_CONTEXT:-..}
       args:
         VERSION: ${APP_VERSION:-verify}
+      # The image never leaves this machine, and writing an attestation for
+      # it adds seconds to every build, even a fully cached one.
+      provenance: false
     depends_on:
       db:
         condition: service_healthy
@@ -81,15 +84,16 @@ services:
     command: ["sh", "-c", "go vet ./... && go test -p 1 -count=1 ./..."]
 
   # Playwright browser tests against the app. The image tag comes from
-  # @playwright/test's version in package.json (see verify.sh).
+  # @playwright/test's version in package.json (see verify.sh). It idles:
+  # verify.sh starts it while the app builds and runs the tests in it with
+  # `exec`, since creating a container takes seconds on Docker Desktop.
   e2e:
     image: mcr.microsoft.com/playwright:v${PW_VERSION:?run through verify.sh}-noble
     profiles: [e2e]
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     working_dir: /e2e
-    depends_on:
-      server:
-        condition: service_healthy
+    init: true
+    command: ["sleep", "infinity"]
     environment:
       HOME: /tmp
       BASE_URL: http://server:8080
